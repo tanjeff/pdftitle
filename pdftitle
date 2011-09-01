@@ -1,0 +1,151 @@
+#!/bin/bash
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+#=========================================================================
+# Sanity checks
+
+ZENITY=`which zenity`
+PDFTK=`which pdftk`
+FILETOOL=`which file`
+PROGNAME=`basename $0`
+
+if ! [ -x "$ZENITY" ]
+then
+    echo "\"zenity\" not installed. Exiting."
+    exit 1
+fi
+
+# At this point we know that zentity is installed.
+
+if ! [ -x "$PDFTK" ]
+then
+    echo "\"pdftk\" not found. Exiting."
+    $ZENITY --error --title="$PROGNAME - tool missing" \
+        --text="\"pdftk\" is not installed on your computer."
+    exit 1
+fi
+
+if ! [ -x "$FILETOOL" ]
+then
+    echo "The tool \"file\" was not found. Exiting."
+    $ZENITY --error --title="$PROGNAME - tool missing" \
+    --text="The \"file\" tool is not installed on your computer."
+    exit 1
+fi
+
+if [ $# -gt 1 -o "$1" == "-h" -o "$1" == "--help" ]
+then
+    echo "Usage: $PROGNAME [PDF-file]"
+    echo "       This program allows to change the title stored in the"
+    echo "       metadata of a PDF file. You can provide a PDF file on the"
+    echo "       command line. If you don't, you are asked graphically"
+    echo "       to provide one. Only one file can be processed at a time."
+    exit 1
+fi
+
+#=========================================================================
+# Determine PDF file (only one is allowed)
+
+if [ $# == 1 -a "$1" != "" ]
+then
+    # Exactly one file was given at the command line
+    PDFFILE="$1"
+else
+    # No or more than one file were given on the command line
+    PDFFILE=`$ZENITY --file-selection --title="$PROGNAME - Choose a PDF file"`
+    if [ $? != 0 ]
+    then
+        echo "CANCEL: user cancelled action"
+        exit 1
+    fi
+fi
+
+# Check wether the file exists
+if ! [ -f "$PDFFILE" ]
+then
+    echo "File \"$PDFFILE\" doesn't exist. Exiting."
+    $ZENITY --error --title="$PROGNAME - No such file" \
+        --text="The file \"$PDFFILE\" doesn't exist."
+    exit 1
+fi
+
+# Check wether the file is a PDF document
+$FILETOOL $PDFFILE | grep PDF > /dev/null
+if [ $? != 0 ]
+then
+    echo "File \"$PDFFILE\" isn't a PDF. Exiting."
+    $ZENITY --error --title="$PROGNAME - Not a PDF" \
+    --text="The file \"$PDFFILE\" seems not to be a PDF file."
+    exit 1
+fi
+
+
+#=========================================================================
+# Get Title of PDF file
+
+TITLE=`$PDFTK "$PDFFILE" dump_data`
+if [ $? != 0 ]
+then
+    echo "File \"$PDFFILE\" seems not to be a PDF. Exiting."
+    $ZENITY --error --title="$PROGNAME - Not a PDF" \
+        --text="The file \"$PDFFILE\" seems not to be a PDF file."
+    exit 1
+fi
+TITLE=`echo "$TITLE" \
+    | grep 'InfoKey: Title' -A 1 \
+    | grep 'InfoValue'`
+TITLE=${TITLE#InfoValue: }
+
+echo -e "\n\ncurrent title: $TITLE"
+
+#=========================================================================
+# Ask user for new title
+
+NEWTITLE=`$ZENITY --entry --title="$PROGNAME - Choose new title" \
+    --text="PDF Title for file \"$PDFFILE\":" \
+    --entry-text="$TITLE"`
+if [ $? != 0 ]
+then
+    echo "CANCEL: user cancelled action"
+    exit 1
+fi
+
+echo "new title: $NEWTITLE"
+
+
+#=========================================================================
+# Put new title into PDF file
+
+
+echo "InfoKey: Title" > "$PDFFILE.pdfinfo"
+echo "InfoValue: $NEWTITLE" >> "$PDFFILE.pdfinfo"
+
+$PDFTK "$PDFFILE" update_info "$PDFFILE.pdfinfo" output "$PDFFILE.new.pdf"
+LASTERR="$?"
+if [ $LASTERR != 0 ]
+then
+    rm "$PDFFILE.pdfinfo"
+    rm "$PDFFILE.new.pdf"
+    echo "$PDFTK reported unexpected error ($LASTERR). Sorry."
+    $ZENITY --error --title="$PROGNAME - Unexpected error" \
+        --text="The tool \"$PDFTK\" failed unexpectedly. I'm Sorry."
+    exit 1
+fi
+
+rm "$PDFFILE.pdfinfo"
+rm "$PDFFILE"
+mv "$PDFFILE.new.pdf" "$PDFFILE"
+
