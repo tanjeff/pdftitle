@@ -18,15 +18,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 About
 -----
 
-This is a little program I wrote to change the title in the metadata of a PDF 
-document. It provides a GUI and can therefore be integrated in graphical 
-environments (e.g. file browsers).
+This is a little bash program I wrote to change the title in the metadata of a 
+PDF document. It provides a GUI and can therefore be integrated in graphical 
+environments (e.g. file browsers). It should run on any Linux box.
 
 
 Usage
 -----
 
 Simply start pdftitle, and a file chooser dialog will be presented. Start it 
-with a PDF file as argument, and this PDF will be modified.  Any errors will 
-be reported in a graphical manner AND to the console.
+with a PDF file as argument, and this PDF will be modified. Most errors will be 
+reported in a graphical manner in addition to the console output.
 
+
+Dependencies
+------------
+
+Pdftitle is implemented as bash script and uses various software to perform its 
+task. Here is a list of software which must be installed:
+
+- zenity (For the GUI)
+- pdftk  (For PDF manipulation)
+
+In addition, some commands are used which are normally installed on a linux 
+system, e.g. 'grep' and 'file'.
